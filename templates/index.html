@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Subdivision Layout Generator — Tasmania</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div id="sidebar">
+  <h1>Subdivision Generator <span class="tag">TAS</span></h1>
+
+  <section>
+    <h2>1. Site</h2>
+    <div class="searchwrap">
+      <input id="search" type="text" placeholder="Search address… e.g. 123 Main Rd Brighton" autocomplete="off">
+      <div id="searchResults" class="results hidden"></div>
+    </div>
+    <div class="row">
+      <button id="pickParcelBtn" class="mode-btn">Click map to pick parcel</button>
+    </div>
+    <div class="row">
+      <label class="filelabel">Upload boundary (.zip shapefile)
+        <input id="shpUpload" type="file" accept=".zip">
+      </label>
+    </div>
+    <div id="parcelInfo" class="info hidden"></div>
+  </section>
+
+  <section>
+    <h2>2. Parameters</h2>
+    <label>Zoning
+      <select id="zone">
+        {% for code, z in zones.items() %}
+        <option value="{{ code }}" data-min="{{ z.min_lot_area }}" data-depth="{{ z.default_lot_depth }}">{{ z.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Target lot size (m²) <span id="targetVal" class="val"></span>
+      <input id="targetArea" type="range" min="450" max="2500" step="25" value="600">
+    </label>
+    <label>Lot depth (m) <span id="depthVal" class="val"></span>
+      <input id="lotDepth" type="range" min="20" max="70" step="1" value="32">
+    </label>
+    <label>Street type
+      <select id="roadPreset">
+        {% for code, label in road_presets.items() %}
+        <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="inline"><input id="autoAngle" type="checkbox" checked> Auto road orientation</label>
+    <label id="angleWrap" class="hidden">Road bearing (° from north)
+      <input id="roadAngle" type="number" min="0" max="180" step="5" value="90">
+    </label>
+    <label>Max block length (m)
+      <input id="blockLen" type="number" min="80" max="400" step="10" value="220">
+    </label>
+    <div class="row">
+      <button id="accessBtn" class="mode-btn">Click boundary to add access point</button>
+    </div>
+    <div id="accessList" class="info hidden"></div>
+  </section>
+
+  <section>
+    <button id="generateBtn" class="primary" disabled>Generate layout</button>
+    <div id="spinner" class="hidden">Generating…</div>
+  </section>
+
+  <section id="resultsSection" class="hidden">
+    <h2>3. Results</h2>
+    <div id="stats" class="stats"></div>
+    <div id="warnings" class="warnings"></div>
+    <div class="row">
+      <button id="gradesBtn">Check road grades (SRTM)</button>
+    </div>
+    <div id="gradeReport" class="info hidden"></div>
+    <h2>4. Export</h2>
+    <div class="row">
+      <button id="exportShp">Shapefile (.zip)</button>
+      <button id="exportPdf">PDF plan</button>
+    </div>
+  </section>
+
+  <footer>
+    Concept tool only — designs require survey &amp; council/TasWater approval.<br>
+    Cadastre © State of Tasmania (the LIST). Standards: SPP Jan 2024, LGAT TIG 2025, TSD v3.
+  </footer>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+GENERATIVE SUBDIVISION LAYOUT APP
+
+OVERVIEW
+
+The purpose of the app is to generate optimal residential subdivision layouts for projects in Tasmania. Subdivisions will generally be between 15-250 lots and general residential zoning.
+
+The app should be made using python flask backend as a web app. It will be uploaded to pythonanywhere via GitHub.
+
+COMPLIANCE 
+
+The layouts must be compliant with:
+Tasmanian infrastructure guidelines
+LGAT standard drawings
+Tasmanian Planning Scheme subdivision requirements
+
+I have placed these references in the project folder.
+
+PROCESS
+
+Ideally, the user should be able to search an address/lot in Tasmania and the app will pull the lot boundaries. The user could also upload a shapefile of the lot boundaries if required.
+
+The output ideally should be a shapefile of the generated lot layout, or at least a pdf plan with a scale bar.
+
+The user should be able to tweak alignments of roads, average lot sizes, zoning, and the layout should update dynamically to suit.
+
+LOGIC
+
+The main feature is to generate road and lot layouts.
+
+The app should take the following factors into account for generating road and lot alignments:
+
+Land gradients (user can upload elevation DEM if the app requires this)
+Road gradients
+Access points to the subdivision from adjacent roads (user can define if app requires this)
+
+
+Ideal features would be:
+Road, sewer, stormwater, water main concept layouts
+User able to set locations of connections to existing water, sewer, stormwater infrastructure
+Take into account likely flow paths from the DEM (OR allow user to draw flow paths to avoid).

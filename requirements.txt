@@ -1,0 +1,7 @@
+flask>=3.0
+shapely>=2.0
+pyproj>=3.6
+numpy>=1.26
+matplotlib>=3.8
+pyshp>=2.3
+requests>=2.31

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+test_output_*
+.venv/
+venv/
+
+# Copyrighted reference documents and raw extracts stay local only
+# (LGAT drawings prohibit reproduction; see STANDARDS_REFERENCE.md for the distilled data)
+*.pdf
+reference_extracts/
+
+.claude/settings.local.json
