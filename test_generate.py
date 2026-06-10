@@ -45,7 +45,7 @@ def main():
           f"road {s['total_road_length_m']:.0f} m ({s['road_area_pct']}%) | "
           f"yield {s['yield_per_ha']}/ha | angle {s['road_angle_deg']}")
     for w in result["warnings"]:
-        print("  WARN:", w)
+        print("  WARN:", w.encode("ascii", "replace").decode())
 
     pdf = export_pdf(result, s, {"address": props.get("PROP_ADD", ""), "pid": props.get("PID")})
     with open("test_output_plan.pdf", "wb") as f:

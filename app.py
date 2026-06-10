@@ -104,12 +104,12 @@ def api_upload_boundary():
 @app.post("/api/generate")
 def api_generate():
     d = request.get_json(force=True)
-    geom = d.get("parcel_geometry")
+    geom = d.get("parcel_geometries") or d.get("parcel_geometry")
     if not geom:
-        return jsonify({"error": "parcel_geometry required"}), 400
+        return jsonify({"error": "parcel_geometry or parcel_geometries required"}), 400
     try:
         params = GenParams.from_dict(d.get("params", {}))
-        result = generate(geom, params)
+        result = generate(geom, params, roads_override=d.get("roads_override"))
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 422
