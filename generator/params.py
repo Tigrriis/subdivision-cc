@@ -35,6 +35,14 @@ ROAD_PRESETS = {
     "collector": {"reserve": 20.0, "carriageway": 11.0, "label": "Collector (20m reserve)"},
 }
 
+# Street layout patterns (IRS Jul 2024: "rectilinear, modified or radiant grid preferred")
+STREET_PATTERNS = {
+    "rectilinear": "Rectilinear grid (straight, most legible)",
+    "modified": "Modified grid (grid + terrain curvature)",
+    "radiant": "Radiant grid (radiates from access/focal point)",
+    "organic": "Organic (curvilinear, follows contours)",
+}
+
 CULDESAC_HEAD_KERB_RADIUS = 9.0       # 18.0m dia face of kerb (TSD R07)
 CULDESAC_HEAD_RESERVE_RADIUS = 12.5   # 25m reserve dia at head (TSD R07)
 CULDESAC_SHORT_MAX_LEN = 150.0        # <=150m allows reduced section (TIG Table 4)
@@ -52,7 +60,8 @@ class GenParams:
     lot_depth: float = 0.0             # 0 -> use zone default
     road_preset: str = "local_min"
     road_angle_deg: float | None = None  # bearing of road direction (deg from East, math convention); None = auto
-    max_block_length: float = 220.0    # m between cross streets
+    max_block_length: float = 180.0    # m between cross streets (IRS: 120-240m, >200m sparingly)
+    street_pattern: str = "modified"   # see STREET_PATTERNS
     access_points: list = field(default_factory=list)  # [(lon, lat), ...]
 
     def zone_preset(self) -> ZonePreset:
@@ -71,6 +80,8 @@ class GenParams:
             p.zone = d["zone"]
         if d.get("road_preset") in ROAD_PRESETS:
             p.road_preset = d["road_preset"]
+        if d.get("street_pattern") in STREET_PATTERNS:
+            p.street_pattern = d["street_pattern"]
         for k in ("target_lot_area", "lot_depth", "max_block_length"):
             if d.get(k) is not None:
                 setattr(p, k, float(d[k]))

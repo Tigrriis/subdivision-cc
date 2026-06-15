@@ -219,6 +219,7 @@ function currentParams() {
     target_lot_area: Number($("targetArea").value),
     lot_depth: Number($("lotDepth").value),
     road_preset: $("roadPreset").value,
+    street_pattern: $("streetPattern").value,
     max_block_length: Number($("blockLen").value),
     road_angle_deg: $("autoAngle").checked ? null : (90 - Number($("roadAngle").value)),
     access_points: accessPoints.map((a) => [a.latlng.lng, a.latlng.lat]),

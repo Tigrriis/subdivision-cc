@@ -1,25 +1,29 @@
-"""Lot subdivision of blocks with curved frontages.
+"""Lot subdivision of blocks into regular rectangular lots.
 
-For each block: find frontage chains (boundary shared with road reserve), place
-cut lines perpendicular to the *local* frontage tangent at jittered spacing,
-add a spine cut equidistant from frontages, polygonise, then merge undersized
-or landlocked faces. Lot orientation therefore follows the street, including
-around curves and corners.
+Method (avoids the thin/irregular faces the old medial-axis polygonise produced):
+  1. Find frontage chains (block boundary shared with the road reserve).
+  2. Process chains longest-first. For each, build a *lot row* = a single-sided
+     strip of depth `lot_depth` measured perpendicular from the frontage, clipped
+     to the block area not yet claimed by an earlier row. The strip's front and
+     rear edges are parallel, so its cross-section is rectangular.
+  3. Split the row into uniform-width pieces with cuts perpendicular to the
+     frontage (uniform spacing => no slivers). Straight frontages give rectangles;
+     curved/corner frontages give chamfered/trapezoidal lots, as intended.
+  4. Whatever the rows don't claim (deep block cores) becomes balance / open space.
 """
 import math
 
-import numpy as np
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
-from shapely.ops import polygonize, unary_union
+from shapely.ops import split, unary_union
 
-FRONTAGE_TOL = 0.35      # m: boundary within this of reserve counts as frontage
+FRONTAGE_TOL = 0.6       # m: boundary within this of reserve counts as frontage
 DENSIFY = 2.0            # m: boundary sampling step
-CUT_OVERSHOOT = 1.75     # cut length = lot_depth * this
-JITTER = 0.10            # +/- proportion of frontage width
+MIN_LOT_DIM = 7.0        # m: discard/merge pieces thinner than this
+ELONG_MAX = 5.0          # max length:width before a piece is treated as a sliver
 
 
 def _polys(geom):
-    if geom.is_empty:
+    if geom is None or geom.is_empty:
         return []
     if isinstance(geom, Polygon):
         return [geom]
@@ -29,6 +33,11 @@ def _polys(geom):
             out.extend(_polys(g))
         return out
     return []
+
+
+def _largest(geom):
+    ps = _polys(geom)
+    return max(ps, key=lambda g: g.area) if ps else None
 
 
 def _frontage_chains(block, reserve_edge):
@@ -47,155 +56,145 @@ def _frontage_chains(block, reserve_edge):
             cur = []
     if len(cur) >= 3:
         chains.append(LineString(cur))
-    # join wrap-around (start/end of ring both frontage)
-    if len(chains) >= 2 and near[0] and near[-1]:
+    if len(chains) >= 2 and near[0] and near[-1]:  # join wrap-around
         first, last = chains[0], chains[-1]
         chains = chains[1:-1] + [LineString(list(last.coords) + list(first.coords))]
     return [c for c in chains if c.length > 6.0]
 
 
-def _cuts_for_chain(chain, block, w, cut_depth, rng):
-    """Perpendicular cut lines along a frontage chain at jittered spacing."""
-    cuts = []
+def _strip(chain, region, depth):
+    """Single-sided strip of `depth` from the chain, on whichever side lies inside region."""
+    best, best_area = None, 0.0
+    for d in (depth, -depth):
+        try:
+            s = chain.buffer(d, single_sided=True).buffer(0)
+        except Exception:
+            continue
+        inter = s.intersection(region)
+        if inter.area > best_area:
+            best_area, best = inter.area, inter
+    return _largest(best)
+
+
+def _elongation(poly):
+    mrr = poly.minimum_rotated_rectangle
+    cs = list(mrr.exterior.coords)
+    d1 = math.hypot(cs[1][0] - cs[0][0], cs[1][1] - cs[0][1])
+    d2 = math.hypot(cs[2][0] - cs[1][0], cs[2][1] - cs[1][1])
+    short, long = min(d1, d2), max(d1, d2)
+    return (long / short if short > 0.1 else 99.0), short
+
+
+def _split_row(row, chain, target_w):
+    """Cut a lot row into uniform-width pieces, perpendicular to the frontage."""
     L = chain.length
-    if L < w * 1.35:
-        return cuts
-    pos = w * (1 + rng.uniform(-JITTER, JITTER))
-    while pos < L - w * 0.55:
-        p = chain.interpolate(pos)
-        a = chain.interpolate(max(0.0, pos - 3.0))
-        b = chain.interpolate(min(L, pos + 3.0))
+    n = max(1, round(L / target_w))
+    aw = L / n
+    pieces = [row]
+    for k in range(1, n):
+        s = k * aw
+        p = chain.interpolate(s)
+        a = chain.interpolate(max(0.0, s - 3.0))
+        b = chain.interpolate(min(L, s + 3.0))
         tx, ty = b.x - a.x, b.y - a.y
         tl = math.hypot(tx, ty) or 1.0
         nx, ny = -ty / tl, tx / tl
-        # ensure normal points into the block
-        probe = Point(p.x + nx * 2.0, p.y + ny * 2.0)
-        if not block.contains(probe):
-            nx, ny = -nx, -ny
-        cuts.append(LineString([(p.x - nx * 0.5, p.y - ny * 0.5),
-                                (p.x + nx * cut_depth, p.y + ny * cut_depth)]))
-        pos += w * (1 + rng.uniform(-JITTER, JITTER))
-    return cuts
+        # cut spans well past the row both ways so split() fully severs the piece
+        cut = LineString([(p.x - nx * 400, p.y - ny * 400), (p.x + nx * 400, p.y + ny * 400)])
+        newp = []
+        for pc in pieces:
+            if cut.intersects(pc):
+                newp.extend(_polys(split(pc, cut)))
+            else:
+                newp.append(pc)
+        pieces = newp
+    return pieces
 
 
-def subdivide_block(block, reserve_edge, lot_depth, target_area, min_area, min_frontage, rng):
-    """Returns (lot_polys, open_space_polys). Each lot is (polygon, frontage_len)."""
-    w = max(10.0, target_area / lot_depth)
+def subdivide_block(block, reserve_edge, lot_depth, target_area, min_area, min_frontage, rng=None):
+    """Returns (lots, open_space). Each lot is (polygon, frontage_len)."""
+    block = _largest(block.buffer(0))
+    if block is None:
+        return [], []
     chains = _frontage_chains(block, reserve_edge)
     if not chains:
         return [], [block]
 
-    # spine: equidistant ridge between opposite frontages. For double-loaded
-    # blocks (~2 x lot_depth deep) buffer(-lot_depth) vanishes, so back off the
-    # erosion until a ridge appears (it sits on the block midline).
-    e = float(lot_depth)
-    spine = block.buffer(-e)
-    while spine.is_empty and e > 6.0:
-        e -= 3.0
-        spine = block.buffer(-e)
+    target_w = max(min_frontage, target_area / lot_depth)
 
-    cut_depth = max(lot_depth * CUT_OVERSHOOT, e * 1.5 + 8.0)
-    cuts = []
-    for ch in chains:
-        cuts.extend(_cuts_for_chain(ch, block, w, cut_depth, rng))
-
-    edges = [block.exterior] + [LineString(r.coords) for r in block.interiors]
-    for c in cuts:
-        edges.append(c)
-    if not spine.is_empty:
-        for sp in _polys(spine):
-            edges.append(LineString(sp.exterior.coords))
-
-    faces = [f for f in polygonize(unary_union(edges))
-             if f.representative_point().within(block)]
-    if not faces:
-        return [(block, block.exterior.intersection(reserve_edge.buffer(FRONTAGE_TOL)).length)], []
-
-    # classify and merge
     def frontage_len(poly):
         return poly.exterior.intersection(reserve_edge.buffer(FRONTAGE_TOL)).length
 
-    lots = [{"g": f, "f": frontage_len(f)} for f in faces]
+    # build lot rows longest frontage first; subtract claimed area so opposite
+    # rows in a shallow (double-loaded) block meet cleanly instead of overlapping
+    remaining = block
+    rows = []
+    for chain in sorted(chains, key=lambda c: -c.length):
+        row = _strip(chain, remaining, lot_depth)
+        if row is None or row.area < min_area * 0.5:
+            continue
+        rows.append((row, chain))
+        remaining = _largest(remaining.difference(row.buffer(-0.05))) or remaining
 
-    def merge_into_neighbour(i):
-        """Merge lots[i] into the adjacent lot sharing the longest boundary."""
-        best_j, best_len = None, 0.0
-        gi = lots[i]["g"]
-        for j, lj in enumerate(lots):
-            if j == i:
+    lots = []
+    for row, chain in rows:
+        for pc in _split_row(row, chain, target_w):
+            if pc.area < 1.0:
                 continue
-            shared = gi.buffer(0.05).intersection(lj["g"].buffer(0.05)).area
-            if shared > best_len:
-                best_len, best_j = shared, j
-        if best_j is None:
-            return False
-        u = unary_union([gi, lots[best_j]["g"]])
-        parts = _polys(u)
-        if len(parts) != 1:
-            return False
-        lots[best_j]["g"] = parts[0]
-        lots[best_j]["f"] = frontage_len(parts[0])
-        lots.pop(i)
-        return True
+            lots.append({"g": pc, "f": frontage_len(pc)})
 
-    # iterate: undersized / narrow faces and SMALL landlocked slivers merge into
-    # neighbours; LARGE landlocked back-land must not inflate a lot — it becomes
-    # open space / residue instead.
-    changed = True
+    # merge sub-minimum / slivered end pieces into the neighbour they share the
+    # most frontage-parallel edge with (keeps lots rectangular, removes slivers)
+    def merge_pass():
+        for i, li in enumerate(lots):
+            elong, short = _elongation(li["g"])
+            too_small = li["g"].area < min_area
+            too_thin = short < MIN_LOT_DIM or elong > ELONG_MAX
+            too_narrow = 1.0 < li["f"] < min_frontage * 0.7
+            if not (too_small or too_thin or too_narrow):
+                continue
+            best_j, best_share = None, 0.0
+            for j, lj in enumerate(lots):
+                if j == i:
+                    continue
+                share = li["g"].buffer(0.05).intersection(lj["g"].buffer(0.05)).area
+                if share > best_share:
+                    best_share, best_j = share, j
+            if best_j is None:
+                continue
+            u = _largest(unary_union([li["g"], lots[best_j]["g"]]))
+            if u is None:
+                continue
+            lots[best_j]["g"] = u
+            lots[best_j]["f"] = frontage_len(u)
+            lots.pop(i)
+            return True
+        return False
+
     guard = 0
-    while changed and guard < 200:
-        changed = False
+    while guard < 300 and merge_pass():
         guard += 1
-        for i in range(len(lots)):
-            li = lots[i]
-            landlocked_small = li["f"] < 1.0 and li["g"].area < 2.0 * min_area
-            undersized = li["f"] >= 1.0 and li["g"].area < min_area
-            narrow = li["f"] > 1.0 and li["f"] < min_frontage * 0.7
-            if landlocked_small or undersized or narrow:
-                if merge_into_neighbour(i):
-                    changed = True
-                    break
 
     out_lots, open_space = [], []
+    leftover = _polys(remaining) if isinstance(remaining, (Polygon, MultiPolygon)) else []
     for li in lots:
+        elong, short = _elongation(li["g"])
         if li["f"] < 1.0:
-            open_space.append(li["g"])  # landlocked back-land
-        elif li["f"] < min_frontage * 1.2 and li["g"].area > 2.5 * target_area:
-            open_space.append(li["g"])  # balance land with token frontage — not a real lot
+            open_space.append(li["g"])          # landlocked
+        elif li["g"].area < min_area * 0.55 or short < MIN_LOT_DIM or elong > ELONG_MAX:
+            open_space.append(li["g"])          # unbuildable sliver — not a real lot
         elif li["g"].area > 4.0 * target_area:
-            open_space.append(li["g"])  # under-served residue — extend a road to serve it
+            open_space.append(li["g"])          # under-served residue
         else:
             out_lots.append((li["g"], li["f"]))
+    for g in leftover:
+        if g.area > min_area * 0.4:
+            open_space.append(g)                # deep block core / balance land
     return out_lots, open_space
 
 
+# Backwards-compatible name used by layout.py (no recursion needed with row method).
 def subdivide_block_recursive(block, reserve_edge, lot_depth, target_area, min_area,
-                              min_frontage, rng, depth=0):
-    """subdivide_block + re-subdivision of oversized faces (deep blocks produce
-    wrap-around residue faces that keep a sliver of frontage; treating them as new
-    blocks slices them properly and sends their landlocked core to open space)."""
-    lots, open_space = subdivide_block(block, reserve_edge, lot_depth, target_area,
-                                       min_area, min_frontage, rng)
-    if depth >= 2:
-        return lots, open_space
-    out = []
-    for g, f in lots:
-        if g.area > 2.6 * target_area:
-            sub_lots, sub_os = subdivide_block(g, reserve_edge, lot_depth, target_area,
-                                               min_area, min_frontage, rng)
-            if len(sub_lots) > 1:
-                deeper, deeper_os = [], list(sub_os)
-                for sg, sf in sub_lots:
-                    if sg.area > 2.6 * target_area and depth + 1 < 2:
-                        dl, dos = subdivide_block_recursive(
-                            sg, reserve_edge, lot_depth, target_area, min_area,
-                            min_frontage, rng, depth + 2)
-                        deeper.extend(dl)
-                        deeper_os.extend(dos)
-                    else:
-                        deeper.append((sg, sf))
-                out.extend(deeper)
-                open_space.extend(deeper_os)
-                continue
-        out.append((g, f))
-    return out, open_space
+                              min_frontage, rng=None, depth=0):
+    return subdivide_block(block, reserve_edge, lot_depth, target_area, min_area,
+                           min_frontage, rng)

@@ -15,7 +15,7 @@ from shapely.ops import transform, unary_union
 from exporters.pdf_export import export_pdf
 from exporters.shapefile_export import export_zip
 from generator.layout import generate
-from generator.params import GenParams, ROAD_PRESETS, ZONES
+from generator.params import GenParams, ROAD_PRESETS, STREET_PATTERNS, ZONES
 from services import elevation, list_api
 
 app = Flask(__name__)
@@ -29,6 +29,7 @@ def index():
         zones={k: {"name": v.name, "min_lot_area": v.min_lot_area, "min_frontage": v.min_frontage,
                    "default_lot_depth": v.default_lot_depth} for k, v in ZONES.items()},
         road_presets={k: v["label"] for k, v in ROAD_PRESETS.items()},
+        street_patterns=STREET_PATTERNS,
     )
 
 

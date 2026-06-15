@@ -135,22 +135,27 @@ def generate(parcel_geoms, params: GenParams, roads_override: dict | None = None
         segs, deadends = roads_mod.prune_network(lines, access_m, parcel)
         chains = roads_mod.chains(segs)
     else:
+        pattern = params.street_pattern
         if params.road_angle_deg is not None:
             angle, angle_note = params.road_angle_deg, "user bearing"
         else:
             angle, angle_note = roads_mod.choose_angle(
                 parcel, terrain, lot_depth, reserve, params.max_block_length, access_m,
                 target_area=target_area)
-        lines = roads_mod.straight_grid(parcel, angle, lot_depth, reserve,
+        angle_note = f"{pattern} · {angle_note}"
+        lines = roads_mod.build_network(parcel, pattern, angle, lot_depth, reserve,
                                         params.max_block_length, access_m)
         segs, deadends = roads_mod.prune_network(lines, access_m, parcel)
         if not segs:
             raise ValueError("Road network generation failed (no reachable roads).")
         chains = roads_mod.chains(segs)
-        chains = roads_mod.warp_chains(chains, parcel, terrain, max_dev=0.35 * lot_depth)
-        # deadends may have residual snap offsets after warping: recompute from chains
-        segs = roads_mod._segments(unary_union(chains))
-        _, deadends = roads_mod.prune_network(chains, access_m, parcel)
+        # rectilinear stays straight; radiant is already curved; modified/organic
+        # follow contours (organic warps harder).
+        if pattern in ("modified", "organic"):
+            max_dev = (0.22 if pattern == "modified" else 0.35) * lot_depth
+            chains = roads_mod.warp_chains(chains, parcel, terrain, max_dev=max_dev)
+            segs = roads_mod._segments(unary_union(chains))
+            _, deadends = roads_mod.prune_network(chains, access_m, parcel)
 
     if not chains:
         raise ValueError("Road network generation failed.")

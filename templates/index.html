@@ -44,6 +44,13 @@
     <label>Lot depth (m) <span id="depthVal" class="val"></span>
       <input id="lotDepth" type="range" min="20" max="70" step="1" value="32">
     </label>
+    <label>Street pattern
+      <select id="streetPattern">
+        {% for code, label in street_patterns.items() %}
+        <option value="{{ code }}"{% if code == 'modified' %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Street type
       <select id="roadPreset">
         {% for code, label in road_presets.items() %}
@@ -55,8 +62,8 @@
     <label id="angleWrap" class="hidden">Road bearing (° from north)
       <input id="roadAngle" type="number" min="0" max="180" step="5" value="90">
     </label>
-    <label>Max block length (m)
-      <input id="blockLen" type="number" min="80" max="400" step="10" value="220">
+    <label>Max block length (m) <span class="hint">IRS: 120–240 m</span>
+      <input id="blockLen" type="number" min="80" max="400" step="10" value="180">
     </label>
     <div class="row">
       <button id="accessBtn" class="mode-btn">Click boundary to add access point</button>

@@ -10,6 +10,7 @@ Austroads Movement & Place; Tas. *Improving Residential Standards* report (2024)
 ## 1. Street network character
 | Principle | Source concept | Engine rule |
 |---|---|---|
+| Choice of street pattern | IRS Jul 2024 ("rectilinear, modified or radiant grid preferred"); MBRC | User selects the pattern; engine builds it: **rectilinear** (straight grid, no warp), **modified** (grid + gentle contour curvature + staggered cross-streets for T-junctions), **radiant** (concentric rings + radial spokes about the access/focal point), **organic** (curvilinear, follows contours hardest). |
 | Connected network, dispersed traffic, route choice | New Urbanism / Fused Grid | Prefer through-streets and loops; cul-de-sacs only where parcels or terrain force dead ends. Connectivity index (links/nodes) reported; target ≥ 1.4. |
 | Walkable blocks | New Urbanism (block perimeter ≤ ~500 m) | Block length capped (default 220 m, user 80–400 m); cross-streets inserted automatically. |
 | Streets follow terrain, not fight it | Hillside guidelines (APA PAS 126; San Diego) | Roads are nudged along contours (constant-elevation seeking within a corridor) and smoothed; grid axis chosen so primary streets run across-slope, not down-slope. |
@@ -21,7 +22,8 @@ Austroads Movement & Place; Tas. *Improving Residential Standards* report (2024)
 ## 2. Lots
 | Principle | Source concept | Engine rule |
 |---|---|---|
-| Lots front the street they belong to | Perimeter block urbanism | Lots are cut perpendicular to the *local frontage tangent*, so orientation varies around curves and corners — no single global grid orientation. |
+| Regular rectangular lots | Subdivision practice ("regular shapes except where frontages curve/chamfer") | Each block frontage builds a parallel-sided *lot row* of depth = lot_depth; the row is split by perpendicular cuts at **uniform** spacing, giving rectangles on straight frontages and chamfered/trapezoidal lots only where the frontage curves. Sub-minimum or over-elongated residue is sent to open space, never kept as a sliver lot. |
+| Lots front the street they belong to | Perimeter block urbanism | Cuts are perpendicular to the *local frontage tangent*, so lot orientation follows the street around curves and corners — no single global grid orientation. |
 | Diversity of lot sizes | New Urbanism (mix of housing) | Frontage widths are jittered ±10 % around the target and corner/end lots absorb remainders, producing a natural size distribution (still ≥ zone minimum). |
 | Solar access | SPP 8.6.1 A4 + passive solar design | Orientation scoring prefers street bearings that keep lot long axes within 30° of N where terrain allows; deviation reported as a warning, never silently ignored. |
 | Build with the slope | Hillside guidelines | Lot envelope check uses the DEM: lots whose buildable core exceeds 1:5 grade are flagged (SPP envelope rule). |

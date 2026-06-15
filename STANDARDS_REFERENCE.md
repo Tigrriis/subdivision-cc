@@ -9,6 +9,41 @@ Sources:
 - **SPP** = State Planning Provisions, Tasmanian Planning Scheme (effective 24 Jan 2024)
 - **TIG** = Tasmanian Infrastructure Guidelines, LGAT 2025
 - **TSD** = Tasmanian Municipal Standard Drawings v3, Dec 2020 (vector drawings — text not extractable; R06/R07 read visually)
+- **IRS** = Improving Residential Standards in Tasmania, State Planning Office Draft Recommendations (Subdivision Factsheet No.2, Jul 2024)
+- **MBRC** = Moreton Bay Neighbourhood Design Guideline (street-pattern reference)
+
+## 0. SUBDIVISION LAYOUT / MOVEMENT NETWORK (IRS Jul 2024 + MBRC)
+
+**Street layout pattern (IRS movement network, permitted pathway):** "Rectilinear, modified
+or radiant grid preferred." Undesired (MBRC): offset grid, fragmented grid, loops-and-lollipops,
+dendritic/cul-de-sac-dominated, "fake" grids (grid-like but disconnected).
+- **Rectilinear grid** — straight through-streets both directions; most legible.
+- **Modified grid** — legible overall structure but grid cells alternate orientation / offset
+  (still gives direct N–S and E–W routes); used to suit topography or reduce 4-way crossings.
+- **Radiant grid** — responds to a focal point (centre/station); transitions to rectilinear away
+  from the focus.
+
+**Street block dimensions (IRS + MBRC):**
+- Block **length 120–240 m**, **width 60–120 m** (MBRC: depth 50–70 m, width 2–3× depth).
+- **Max street block perimeter 600 m** (400–500 m near centres/transit); larger blocks need a
+  mid-block pedestrian link.
+- Block lengths **> 200 m only sparingly** + mid-block link.
+
+**Cul-de-sacs:** max **15% of lots** may front a cul-de-sac; max length **150 m**; heads to
+include pedestrian links where relevant. (Reinforces TIG/TSD cul-de-sac rules in §2.6.)
+
+**Connectivity:** subdivision roads must connect to existing and planned external roads; prefer
+a high proportion of **4-way intersections** for legibility (rotate parts of the grid 90° to
+manage excess 4-way crossings on busier streets).
+
+**Orientation (IRS + MBRC + SPP 8.6.1 A4):** streets approximately **east–west** give best solar
+access; **north–south streets on the short side of blocks**. Lot long axis within 30° of north.
+
+**Lot diversity (IRS, dev ≥15 lots within 800 m of business/transit):** 15% of lots at the
+minimum size AND 15% of lots ≥ 1000 m². Townhouse lots: GRZ 250 m²/10 m frontage, IRZ 160 m²/3.6 m.
+
+**Urban greening (IRS):** public open space = **10% land contribution for 50+ lot** subdivisions
+(cash-in-lieu under 50); **1 street tree per 2 lots**.
 
 ---
 

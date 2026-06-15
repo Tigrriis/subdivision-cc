@@ -112,9 +112,20 @@ def choose_angle(parcel, terrain, lot_depth, reserve, max_block_len, access_m,
     return best_angle, best_note
 
 
-# --------------------------------------------------------------- grid + access
-def straight_grid(parcel, angle, lot_depth, reserve, max_block_len, access_m):
-    """Straight skeleton of the network in MGA coords (built in a rotated frame)."""
+# --------------------------------------------------------------- patterns
+def build_network(parcel, pattern, angle, lot_depth, reserve, max_block_len, access_m):
+    """Dispatch to a street-pattern generator. Returns road centrelines (MGA)."""
+    if pattern == "radiant":
+        focal = access_m[0] if access_m else parcel.representative_point()
+        return radiant_grid(parcel, focal, lot_depth, reserve, max_block_len, access_m)
+    stagger = (pattern == "modified")
+    return straight_grid(parcel, angle, lot_depth, reserve, max_block_len, access_m,
+                         stagger=stagger)
+
+
+def straight_grid(parcel, angle, lot_depth, reserve, max_block_len, access_m, stagger=False):
+    """Straight skeleton of the network in MGA coords (built in a rotated frame).
+    `stagger` offsets alternate cross streets (modified grid) for T-intersections."""
     origin = (parcel.centroid.x, parcel.centroid.y)
     rot = affinity.rotate(parcel, -angle, origin=origin)
     minx, miny, maxx, maxy = rot.bounds
@@ -138,9 +149,21 @@ def straight_grid(parcel, angle, lot_depth, reserve, max_block_len, access_m):
         xs = [minx + span * (i + 1) / (n_cross + 1) for i in range(n_cross)]
         if access_rot:
             xs[0] = min(max(access_rot[0].x, minx + lot_depth), maxx - lot_depth)
-        for x in xs:
-            seg = LineString([(x, miny - 50), (x, maxy + 50)]).intersection(inset)
-            lines.extend([l for l in _lines(seg) if l.length > MIN_ROAD_PIECE])
+        for j, x in enumerate(xs):
+            if stagger and j % 2 == 1:
+                # break alternate cross streets at the midline -> T-intersections,
+                # keeping continuous through-streets in the primary direction
+                mid = (miny + maxy) / 2.0
+                for y0, y1 in ((miny - 50, mid + reserve / 2), (mid - reserve / 2, maxy + 50)):
+                    if (j // 2) % 2 == 0 and y0 < mid:
+                        continue
+                    if (j // 2) % 2 == 1 and y0 >= mid:
+                        continue
+                    seg = LineString([(x, y0), (x, y1)]).intersection(inset)
+                    lines.extend([l for l in _lines(seg) if l.length > MIN_ROAD_PIECE])
+            else:
+                seg = LineString([(x, miny - 50), (x, maxy + 50)]).intersection(inset)
+                lines.extend([l for l in _lines(seg) if l.length > MIN_ROAD_PIECE])
     if not lines:
         raise ValueError("Could not fit any roads in the parcel with the current parameters.")
 
@@ -152,6 +175,56 @@ def straight_grid(parcel, angle, lot_depth, reserve, max_block_len, access_m):
         if npt.distance(ap) > 1.0:
             lines.append(LineString([(ap.x, ap.y), (npt.x, npt.y)]))
     return [affinity.rotate(l, angle, origin=origin) for l in lines]
+
+
+def radiant_grid(parcel, focal, lot_depth, reserve, max_block_len, access_m):
+    """Concentric ring streets + radial spokes about a focal point (e.g. the gateway).
+    Per MBRC, radiant grids respond to a focal point and transition outward."""
+    cx, cy = focal.x, focal.y
+    inset = parcel.buffer(-(reserve / 2 + 0.5))
+    if inset.is_empty:
+        raise ValueError("Parcel too small for an internal road reserve.")
+    verts = list(parcel.exterior.coords)
+    maxr = max(math.hypot(x - cx, y - cy) for x, y in verts)
+    spacing = 2 * lot_depth + reserve
+
+    # start rings beyond an inner radius so blocks near the focal point are not tiny
+    r0 = max(spacing, 1.5 * lot_depth)
+    lines = []
+    r = r0
+    radii = []
+    while r < maxr + spacing:
+        ring = Point(cx, cy).buffer(r, resolution=72).exterior
+        seg = ring.intersection(inset)
+        lines.extend([l for l in _lines(seg) if l.length > MIN_ROAD_PIECE])
+        radii.append(r)
+        r += spacing
+    # radial spokes across the parcel's actual angular extent from the focal point
+    # (a focal point on the boundary only subtends part of a full circle)
+    angs = np.sort(np.array([math.atan2(y - cy, x - cx) for x, y in verts[:-1]]))
+    gaps = np.diff(np.concatenate([angs, [angs[0] + 2 * math.pi]]))
+    imax = int(np.argmax(gaps))
+    start = angs[(imax + 1) % len(angs)]
+    span = 2 * math.pi - gaps[imax]
+    midr = (r0 + maxr) / 2
+    dtheta = max(0.10, (2 * lot_depth + reserve) / max(midr, 1.0))  # arc ~ block width
+    nspokes = max(2, int(span / dtheta) + 1)
+    for k in range(nspokes + 1):
+        th = start + span * k / nspokes
+        near = (cx + r0 * 0.6 * math.cos(th), cy + r0 * 0.6 * math.sin(th))
+        far = (cx + (maxr + spacing) * math.cos(th), cy + (maxr + spacing) * math.sin(th))
+        seg = LineString([near, far]).intersection(inset)
+        lines.extend([l for l in _lines(seg) if l.length > MIN_ROAD_PIECE])
+    if not lines:
+        raise ValueError("Could not fit a radiant network in the parcel.")
+
+    lines = _connect_components(lines, parcel, reserve)
+    grid_union = unary_union(lines)
+    for ap in access_m:
+        npt = nearest_points(grid_union, ap)[0]
+        if npt.distance(ap) > 1.0:
+            lines.append(LineString([(ap.x, ap.y), (npt.x, npt.y)]))
+    return lines
 
 
 def _connect_components(lines, parcel, reserve, max_join=400.0):

@@ -13,9 +13,13 @@ Guidelines 2025 and the Tasmanian Municipal Standard Drawings v3.
   scoring estimated yield + contour alignment + solar orientation; road centrelines are
   **warped to follow contours** on sloped sites (gentle aesthetic curvature on flat ones);
   per-road max grades computed from the DEM.
-- **Street-responsive lots**: lots are cut perpendicular to the local frontage tangent, so
-  orientation varies around curves and corners; jittered frontage widths give a natural
-  size mix; landlocked/under-served residue becomes balance land instead of fake lots.
+- **Selectable street patterns**: rectilinear / modified / radiant grid (per the IRS draft
+  subdivision standards) plus an organic curvilinear option; block length defaults to the
+  IRS 120–240 m range.
+- **Regular rectangular lots**: each frontage builds a parallel-sided lot row split by uniform
+  perpendicular cuts — rectangles on straight streets, chamfered/trapezoidal only on curves;
+  sub-minimum or over-elongated residue is classed as open space, not kept as a sliver lot.
+  Cuts follow the local frontage tangent, so orientation varies around curves and corners.
 - **Tweakable roads**: every road has drag handles (leaflet-geoman) — realign and hit
   *Recalculate lots from my roads* (terrain is cached, so regeneration takes ~2 s), or
   *Reset layout* to start over.
